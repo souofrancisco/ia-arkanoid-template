@@ -1,0 +1,50 @@
+{
+  "screen": {
+    "width": 600,
+    "height": 800,
+    "ceiling_y": 82.0
+  },
+  "paddle": {
+    "width": 84.0,
+    "height": 14.0,
+    "y": 740.0,
+    "speed": 350.0,
+    "step_distance": 28.0,
+    "left_ratio": 0.3333,
+    "center_ratio": 0.3334,
+    "right_ratio": 0.3333,
+    "angles": {
+      "alpha_deg": 8.0,
+      "side_deg": 45.0,
+      "beta_deg": 15.0
+    }
+  },
+  "ball": {
+    "radius": 6.0,
+    "speed": 400.0,
+    "initial_speed": 400.0
+  },
+  "bricks": {
+    "width": 50.0,
+    "height": 20.0,
+    "types": {
+      "red": { "health": 1, "indestructible": false, "points": 50, "color": "#bf616a" },
+      "blue": { "health": 2, "indestructible": false, "points": 100, "color": "#81a1c1" },
+      "green": { "health": 3, "indestructible": false, "points": 150, "color": "#a3be8c" },
+      "yellow": { "health": 4, "indestructible": false, "points": 200, "color": "#ebcb8b" },
+      "metal": { "health": -1, "indestructible": true, "points": 10, "color": "#d8dee9" }
+    }
+  },
+  "game": {
+    "lives": 3,
+    "fps": 30,
+    "maps_dir": "maps",
+    "highscores_file": "highscores.csv",
+    "level_time_limit": 600.0,
+    "level_sequence": [
+      "level1.json",
+      "level2.json",
+      "level3.json"
+    ]
+  }
+}

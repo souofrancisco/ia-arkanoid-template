@@ -1,0 +1,46 @@
+{
+  "name": "Stage 1 - Classic Assault",
+  "brick_width": 50.0,
+  "brick_height": 20.0,
+  "bricks": [
+    { "x": 35.0, "y": 120.0, "type": "red", "health": 1, "indestructible": false },
+    { "x": 95.0, "y": 120.0, "type": "red", "health": 1, "indestructible": false },
+    { "x": 155.0, "y": 120.0, "type": "red", "health": 1, "indestructible": false },
+    { "x": 215.0, "y": 120.0, "type": "red", "health": 1, "indestructible": false },
+    { "x": 275.0, "y": 120.0, "type": "red", "health": 1, "indestructible": false },
+    { "x": 335.0, "y": 120.0, "type": "red", "health": 1, "indestructible": false },
+    { "x": 395.0, "y": 120.0, "type": "red", "health": 1, "indestructible": false },
+    { "x": 455.0, "y": 120.0, "type": "red", "health": 1, "indestructible": false },
+    { "x": 515.0, "y": 120.0, "type": "red", "health": 1, "indestructible": false },
+
+    { "x": 35.0, "y": 145.0, "type": "metal", "health": -1, "indestructible": true },
+    { "x": 95.0, "y": 145.0, "type": "blue", "health": 2, "indestructible": false },
+    { "x": 155.0, "y": 145.0, "type": "blue", "health": 2, "indestructible": false },
+    { "x": 215.0, "y": 145.0, "type": "blue", "health": 2, "indestructible": false },
+    { "x": 275.0, "y": 145.0, "type": "blue", "health": 2, "indestructible": false },
+    { "x": 335.0, "y": 145.0, "type": "blue", "health": 2, "indestructible": false },
+    { "x": 395.0, "y": 145.0, "type": "blue", "health": 2, "indestructible": false },
+    { "x": 455.0, "y": 145.0, "type": "blue", "health": 2, "indestructible": false },
+    { "x": 515.0, "y": 145.0, "type": "metal", "health": -1, "indestructible": true },
+
+    { "x": 35.0, "y": 170.0, "type": "blue", "health": 2, "indestructible": false },
+    { "x": 95.0, "y": 170.0, "type": "blue", "health": 2, "indestructible": false },
+    { "x": 155.0, "y": 170.0, "type": "green", "health": 3, "indestructible": false },
+    { "x": 215.0, "y": 170.0, "type": "green", "health": 3, "indestructible": false },
+    { "x": 275.0, "y": 170.0, "type": "green", "health": 3, "indestructible": false },
+    { "x": 335.0, "y": 170.0, "type": "green", "health": 3, "indestructible": false },
+    { "x": 395.0, "y": 170.0, "type": "green", "health": 3, "indestructible": false },
+    { "x": 455.0, "y": 170.0, "type": "blue", "health": 2, "indestructible": false },
+    { "x": 515.0, "y": 170.0, "type": "blue", "health": 2, "indestructible": false },
+
+    { "x": 35.0, "y": 195.0, "type": "red", "health": 1, "indestructible": false },
+    { "x": 95.0, "y": 195.0, "type": "red", "health": 1, "indestructible": false },
+    { "x": 155.0, "y": 195.0, "type": "red", "health": 1, "indestructible": false },
+    { "x": 215.0, "y": 195.0, "type": "red", "health": 1, "indestructible": false },
+    { "x": 275.0, "y": 195.0, "type": "red", "health": 1, "indestructible": false },
+    { "x": 335.0, "y": 195.0, "type": "red", "health": 1, "indestructible": false },
+    { "x": 395.0, "y": 195.0, "type": "red", "health": 1, "indestructible": false },
+    { "x": 455.0, "y": 195.0, "type": "red", "health": 1, "indestructible": false },
+    { "x": 515.0, "y": 195.0, "type": "red", "health": 1, "indestructible": false }
+  ]
+}

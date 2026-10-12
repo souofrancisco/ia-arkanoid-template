@@ -1,0 +1,40 @@
+{
+  "name": "Stage 2 - Diamond Pyramid",
+  "brick_width": 50.0,
+  "brick_height": 20.0,
+  "bricks": [
+    { "x": 275.0, "y": 100.0, "type": "metal", "health": -1, "indestructible": true },
+
+    { "x": 215.0, "y": 125.0, "type": "green", "health": 3, "indestructible": false },
+    { "x": 275.0, "y": 125.0, "type": "yellow", "health": 4, "indestructible": false },
+    { "x": 335.0, "y": 125.0, "type": "green", "health": 3, "indestructible": false },
+
+    { "x": 155.0, "y": 150.0, "type": "metal", "health": -1, "indestructible": true },
+    { "x": 215.0, "y": 150.0, "type": "blue", "health": 2, "indestructible": false },
+    { "x": 275.0, "y": 150.0, "type": "green", "health": 3, "indestructible": false },
+    { "x": 335.0, "y": 150.0, "type": "blue", "health": 2, "indestructible": false },
+    { "x": 395.0, "y": 150.0, "type": "metal", "health": -1, "indestructible": true },
+
+    { "x": 95.0, "y": 175.0, "type": "blue", "health": 2, "indestructible": false },
+    { "x": 155.0, "y": 175.0, "type": "blue", "health": 2, "indestructible": false },
+    { "x": 215.0, "y": 175.0, "type": "green", "health": 3, "indestructible": false },
+    { "x": 335.0, "y": 175.0, "type": "green", "health": 3, "indestructible": false },
+    { "x": 395.0, "y": 175.0, "type": "blue", "health": 2, "indestructible": false },
+    { "x": 455.0, "y": 175.0, "type": "blue", "health": 2, "indestructible": false },
+
+    { "x": 35.0, "y": 200.0, "type": "red", "health": 1, "indestructible": false },
+    { "x": 95.0, "y": 200.0, "type": "red", "health": 1, "indestructible": false },
+    { "x": 155.0, "y": 200.0, "type": "red", "health": 1, "indestructible": false },
+    { "x": 215.0, "y": 200.0, "type": "red", "health": 1, "indestructible": false },
+    { "x": 275.0, "y": 200.0, "type": "red", "health": 1, "indestructible": false },
+    { "x": 335.0, "y": 200.0, "type": "red", "health": 1, "indestructible": false },
+    { "x": 395.0, "y": 200.0, "type": "red", "health": 1, "indestructible": false },
+    { "x": 455.0, "y": 200.0, "type": "red", "health": 1, "indestructible": false },
+    { "x": 515.0, "y": 200.0, "type": "red", "health": 1, "indestructible": false },
+
+    { "x": 155.0, "y": 225.0, "type": "red", "health": 1, "indestructible": false },
+    { "x": 215.0, "y": 225.0, "type": "red", "health": 1, "indestructible": false },
+    { "x": 335.0, "y": 225.0, "type": "red", "health": 1, "indestructible": false },
+    { "x": 395.0, "y": 225.0, "type": "red", "health": 1, "indestructible": false }
+  ]
+}

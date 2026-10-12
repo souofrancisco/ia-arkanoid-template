@@ -1,0 +1,51 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=512]
+
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff (server, agents, viewer, tests)
+        entry: ruff check server agents viewer tests
+        language: system
+        files: '(\.py$|^pyproject\.toml$)'
+        pass_filenames: false
+
+      - id: basedpyright
+        name: basedpyright
+        entry: basedpyright
+        language: system
+        files: '(\.py$|^pyproject\.toml$)'
+        pass_filenames: false
+
+      - id: vulture
+        name: vulture
+        entry: vulture server agents viewer tests .vulture_whitelist.py
+        language: system
+        files: '(\.py$|^pyproject\.toml$)'
+        pass_filenames: false
+
+      - id: unittest
+        name: unittest
+        entry: ./venv/bin/python -m unittest discover -s tests
+        language: system
+        files: '(\.py$|^pyproject\.toml$)'
+        pass_filenames: false
+
+      - id: coverage
+        name: coverage (unittest, --fail-under)
+        entry: >-
+          bash -c 'PYTHONPATH=.:$PWD/venv/lib64/python3.12/site-packages:$PWD/venv/lib/python3.12/site-packages
+          coverage run --source=server,agents -m unittest discover -s tests -q &&
+          coverage report --fail-under=80'
+        language: system
+        files: '(\.py$|^pyproject\.toml$)'
+        pass_filenames: false
