@@ -22,11 +22,15 @@ def tri_ppf(u: float, c: float, h: float) -> float:
     return c - h + h * math.sqrt(2 * u) if u < 0.5 else c + h - h * math.sqrt(2 * (1 - u))
 
 
-def angles(zone: int) -> list[float]:
+def angles(zone: int, k: int | None = None) -> list[float]:
+    k = k or K_SAMPLES
     c, h = 45.0 * zone, (CFG["alpha"] if zone == 0 else CFG["beta"])
-    return [tri_ppf((i + 0.5) / K_SAMPLES, c, h) for i in range(K_SAMPLES)]
+    return [tri_ppf((i + 0.5) / k, c, h) for i in range(k)]
 
 AGENT_ID: str | None = None  # TODO(group): set to a group member's mechanographic number before submission
+HORIZON = 1  # 2 adds a greedy second paddle cycle after each sampled first cycle
+K2 = 3  # angle samples per zone in the second cycle
+GAMMA = 0.9  # weight of the second cycle
 K_SAMPLES = 9  # stratified quantiles of the triangular bounce-angle distribution per zone
 W_BREAK = 0.5  # extra utility for finishing a brick (on top of 1 per hit)
 W_NEAR = 0.002  # utility per px of closeness of the flight to the nearest live destructible brick
@@ -75,10 +79,29 @@ class StudentAgent(BaseAgent):
                 cycle = max(t2 if x2 is not None else 20.0, CYCLE_FLOOR)
                 near = min((math.hypot(qx - cx, qy - cy) for qx, qy in path for cx, cy in centres), default=0.0)
                 u += (hits + W_BREAK * breaks) / cycle - W_NEAR * near
+                if HORIZON >= 2 and x2 is not None:
+                    u += GAMMA * self.second_cycle(f, x2, centres)
             u = u / K_SAMPLES - 1e-4 * moves
             if u > best_u:
                 best_u, best_p = u, p
         return best_p
+
+    def second_cycle(self, f: Field, x: float, centres: list) -> float:
+        """Best zone's mean utility of the next paddle cycle from landing point x (state after the first cycle)."""
+        s1 = f.snapshot()
+        best = -math.inf
+        for zone in (-1, 0, 1):
+            tot = 0.0
+            for ang in angles(zone, K2):
+                f.restore(s1)
+                zvx, zvy = zone_velocity(f, zone, ang)
+                x2, t2, hits, breaks, _, path = fly(f, x, f.y_pad, zvx, zvy)
+                cyc = max(t2 if x2 is not None else 20.0, CYCLE_FLOOR)
+                near = min((math.hypot(qx - cx, qy - cy) for qx, qy in path for cx, cy in centres), default=0.0)
+                tot += (hits + W_BREAK * breaks) / cyc - W_NEAR * near
+            best = max(best, tot / K2)
+        f.restore(s1)
+        return best
 
     async def deliberate(self) -> dict[str, Any] | None:
         st = self.current_state
