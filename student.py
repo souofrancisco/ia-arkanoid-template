@@ -29,7 +29,6 @@ AGENT_ID: str | None = None  # TODO(group): set to a group member's mechanograph
 ANGLES = {"side": 45.0, "alpha": 8.0, "beta": 15.0}  # config.json paddle.angles (centre +-alpha, sides side +-beta)
 K_SAMPLES = 9  # stratified quantiles of the triangular bounce-angle distribution per zone
 W_BREAK = 0.5  # extra utility for finishing a brick (on top of 1 per hit)
-W_NEAR = 0.002  # utility per px of closeness of the flight to the nearest live destructible brick
 CYCLE_FLOOR = 1.0  # seconds; keeps the rate finite for very short flights
 TAIL_THRESH = 1.0  # expected damage below which the value function replaces the rate utility
 VT_GRID = 13  # landing-x grid points of the value table
@@ -85,8 +84,6 @@ class StudentAgent(BaseAgent):
         options = self.zone_options(xl, tl, px, lat, st["paddle_width"], f)
         if not options:
             return None
-        live = f.alive & f.destructible
-        centres = list(zip(((f.x0 + f.x1) / 2)[live], ((f.y0 + f.y1) / 2)[live], strict=True)) if live.any() else []
         best_u, best_p = -math.inf, None
         gains: dict[int, float] = {}
         landings: dict[int, list[tuple[float, float | None]]] = {}
@@ -95,10 +92,9 @@ class StudentAgent(BaseAgent):
             outcomes = []
             for ang in angles(zone):
                 f.restore(after_base)
-                x2, t2, hits, breaks, _, path = fly(f, xl, f.y_pad, *zone_velocity(f, zone, ang))
+                x2, t2, hits, breaks, *_ = fly(f, xl, f.y_pad, *zone_velocity(f, zone, ang))
                 cycle = max(t2 if x2 is not None else 20.0, CYCLE_FLOOR)
-                near = min((math.hypot(qx - cx, qy - cy) for qx, qy in path for cx, cy in centres), default=0.0)
-                u += (hits + W_BREAK * breaks) / cycle - W_NEAR * near
+                u += (hits + W_BREAK * breaks) / cycle
                 g += hits + W_BREAK * breaks
                 outcomes.append((hits + W_BREAK * breaks, x2))
             u = u / K_SAMPLES - 1e-4 * moves
