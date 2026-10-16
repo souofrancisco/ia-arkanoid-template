@@ -8,6 +8,8 @@ the outcome (brick damage per second) and walks the paddle to the lattice positi
 import argparse
 import asyncio
 import math
+
+import numpy as np
 from typing import Any
 
 from agents.base_agent import BaseAgent
@@ -28,6 +30,11 @@ def angles(zone: int, k: int | None = None) -> list[float]:
     return [tri_ppf((i + 0.5) / k, c, h) for i in range(k)]
 
 AGENT_ID: str | None = None  # TODO(group): set to a group member's mechanographic number before submission
+VALUE_TAIL = False  # when no zone is expected to hit, choose by a value function over landing x (value iteration, static bricks)
+VT_GRID = 21  # landing-x grid points
+VT_K = 5  # angle samples per (x, zone) in the value table
+VT_ITERS = 8
+VT_GAMMA = 0.85
 TAIL_DEPTH = 0  # >0: when no zone is expected to hit anything, search this many paddle cycles ahead (sequence of zones)
 TAIL_THRESH = 0.3  # expected damage below which the tail search replaces the rate utility
 TAIL_K = 3  # angle samples per zone at the first tail level (deeper levels use the nominal angle)
@@ -48,6 +55,7 @@ class StudentAgent(BaseAgent):
         self._target: float | None = None
         self._tracker: PaddleTracker | None = None
         self._last = 0
+        self._vt_key: tuple | None = None
 
     def plan(self, st: dict[str, Any], px: float, lat: int) -> float | None:
         f = Field(st)
@@ -75,9 +83,11 @@ class StudentAgent(BaseAgent):
         )
         best_u, best_p = -math.inf, None
         gains: dict[int, float] = {}
+        trans_of: dict[int, list] = {}
         for zone, (moves, _, p) in best_for_zone.items():
             u = 0.0
             g = 0.0
+            trans = []
             for ang in angles(zone):
                 f.restore(after_base)
                 zvx, zvy = zone_velocity(f, zone, ang)
@@ -86,12 +96,23 @@ class StudentAgent(BaseAgent):
                 near = min((math.hypot(qx - cx, qy - cy) for qx, qy in path for cx, cy in centres), default=0.0)
                 u += (hits + W_BREAK * breaks) / cycle - W_NEAR * near
                 g += hits + W_BREAK * breaks
+                trans.append((hits + W_BREAK * breaks, x2))
                 if HORIZON >= 2 and x2 is not None:
                     u += GAMMA * self.second_cycle(f, x2, centres)
             u = u / K_SAMPLES - 1e-4 * moves
             gains[zone] = g / K_SAMPLES
+            trans_of[zone] = trans
             if u > best_u:
                 best_u, best_p = u, p
+        if VALUE_TAIL and max(gains.values()) < TAIL_THRESH:
+            v = self.value_table(f, after_base)
+            best_q, vt_p = -math.inf, best_p
+            for zone, (moves, _, p) in best_for_zone.items():
+                q = sum(g + VT_GAMMA * (float(np.interp(x2, self._vx, v)) if x2 is not None else 0.0)
+                        for g, x2 in trans_of[zone]) / len(trans_of[zone]) - 1e-4 * moves
+                if q > best_q:
+                    best_q, vt_p = q, p
+            return vt_p
         if TAIL_DEPTH and max(gains.values()) < TAIL_THRESH:
             best_v, tail_p = -math.inf, best_p
             for zone, (moves, _, p) in best_for_zone.items():
@@ -101,6 +122,29 @@ class StudentAgent(BaseAgent):
             if best_v > 1e-9:  # only override when the search actually finds damage
                 return tail_p
         return best_p
+
+    def value_table(self, f: Field, snap: Any) -> np.ndarray:
+        """V(x): expected discounted damage over future cycles when the ball lands at x, bricks frozen at `snap`."""
+        key = (tuple(snap[0].tolist()), tuple(snap[1].tolist()))
+        if self._vt_key == key:
+            return self._vt
+        xs = np.linspace(f.r, f.W - f.r, VT_GRID)
+        G = np.zeros((VT_GRID, 3, VT_K))
+        X2 = np.zeros((VT_GRID, 3, VT_K))
+        for i, x in enumerate(xs):
+            for zi, zone in enumerate((-1, 0, 1)):
+                for si, ang in enumerate(angles(zone, VT_K)):
+                    f.restore(snap)
+                    zvx, zvy = zone_velocity(f, zone, ang)
+                    x2, _, hits, breaks, _, _ = fly(f, float(x), f.y_pad, zvx, zvy)
+                    G[i, zi, si] = hits + W_BREAK * breaks
+                    X2[i, zi, si] = x2 if x2 is not None else x
+        f.restore(snap)
+        V = np.zeros(VT_GRID)
+        for _ in range(VT_ITERS):
+            V = (G + VT_GAMMA * np.interp(X2, xs, V)).mean(axis=2).max(axis=1)
+        self._vx, self._vt, self._vt_key = xs, V, key
+        return V
 
     def deep(self, f: Field, snap: Any, x: float, zone: int, depth: int, k: int) -> float:
         """Mean damage (hits + W_BREAK*breaks, discounted) of a paddle contact in `zone` at x, then the best zone each later cycle."""
