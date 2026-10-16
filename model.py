@@ -34,6 +34,7 @@ class Field:
         self.health = np.array([INF_HEALTH if b["indestructible"] else b["hits_remaining"] for b in bricks], dtype=np.int32)
         self.points = np.array([0 if b["indestructible"] else b["points"] for b in bricks], dtype=np.float64)
         self.alive = np.ones(len(bricks), dtype=bool)
+        self.hit_log: list[int] = []  # destructible bricks damaged by the last fly(), in order
         self.destructible = self.health < INF_HEALTH
 
     def snapshot(self) -> tuple[np.ndarray, np.ndarray]:
@@ -50,6 +51,7 @@ def fly(f: Field, x: float, y: float, vx: float, vy: float, max_events: int = 40
     x_land is None if the ball never comes down within max_events.
     """
     t = 0.0
+    f.hit_log = []
     hits = breaks = 0
     pts = 0.0
     r, W = f.r, f.W
@@ -124,6 +126,7 @@ def fly(f: Field, x: float, y: float, vx: float, vy: float, max_events: int = 40
                 y = (f.y0[bi] - 1e-2) if ny < 0 else (f.y1[bi] + 1e-2)
             if f.destructible[bi]:
                 hits += 1
+                f.hit_log.append(bi)
                 f.health[bi] -= 1
                 if f.health[bi] <= 0:
                     f.alive[bi] = False

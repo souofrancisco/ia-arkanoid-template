@@ -34,6 +34,9 @@ def angles(zone: int, k: int | None = None) -> list[float]:
 LATEST_LOOP = True  # False = the template's BaseAgent.run (answers every queued state; collapses if a decision takes > ~33 ms)
 AGENT_ID: str | None = None  # TODO(group): set to a group member's mechanographic number before submission
 VALUE_TAIL = True  # when no zone is expected to hit, choose by a value function over landing x (value iteration, static bricks)
+SCARCITY = 0.0  # >0: bricks that few launches reach are worth up to 1+SCARCITY hits (reach map, 11x3x3 flights per brick state)
+SC_GRID = 11
+SC_K = 3
 MC_DEPTH = 0  # >0: score each zone by damage/time over this many cycles of a greedy rollout policy (brick changes modelled)
 MC_SAMPLES = 5
 VALUE_BLEND = 0.0  # >0: add this weight times V(next landing x) to every sample's utility (all game phases)
@@ -91,6 +94,7 @@ class StudentAgent(BaseAgent):
             list(zip(((f.x0 + f.x1) / 2)[live], ((f.y0 + f.y1) / 2)[live], strict=True)) if live.any() else []
         )
         vtab = self.value_table(f, after_base) if VALUE_BLEND > 0 else None
+        bw = self.brick_weights(f, after_base) if SCARCITY > 0 else None
         if MC_DEPTH:
             best_u, best_p = -math.inf, None
             for zone, (moves, _, p) in best_for_zone.items():
@@ -116,6 +120,8 @@ class StudentAgent(BaseAgent):
                 x2, t2, hits, breaks, _, path = fly(f, xl, f.y_pad, zvx, zvy)
                 cycle = max(t2 if x2 is not None else 20.0, CYCLE_FLOOR)
                 near = min((math.hypot(qx - cx, qy - cy) for qx, qy in path for cx, cy in centres), default=0.0)
+                if bw is not None:
+                    hits = float(sum(bw[i] for i in f.hit_log))
                 u += (hits + W_BREAK * breaks) / cycle - W_NEAR * near
                 g += hits + W_BREAK * breaks
                 if vtab is not None and x2 is not None:
@@ -171,6 +177,31 @@ class StudentAgent(BaseAgent):
                 break
             x = x2
         return dmg, tim
+
+    def brick_weights(self, f: Field, snap: Any) -> np.ndarray:
+        """Per-brick value 1..1+SCARCITY: 1 for bricks every launch reaches, up to 1+SCARCITY for the least reachable."""
+        key = (tuple(snap[0].tolist()), tuple(snap[1].tolist()))
+        if getattr(self, "_bw_key", None) == key:
+            return self._bw
+        n = len(f.health)
+        reach = np.zeros(n)
+        total = 0
+        for x in np.linspace(f.r, f.W - f.r, SC_GRID):
+            for zone in (-1, 0, 1):
+                for ang in angles(zone, SC_K):
+                    f.restore(snap)
+                    fly(f, float(x), f.y_pad, *zone_velocity(f, zone, ang))
+                    for b in set(f.hit_log):
+                        reach[b] += 1
+                    total += 1
+        f.restore(snap)
+        live = f.alive & f.destructible
+        rmax = reach[live].max() if live.any() else 0.0
+        w = np.ones(n)
+        if rmax > 0:
+            w = 1.0 + SCARCITY * (1.0 - reach / rmax)
+        self._bw, self._bw_key = w, key
+        return w
 
     def value_table(self, f: Field, snap: Any) -> np.ndarray:
         """V(x): expected discounted damage over future cycles when the ball lands at x, bricks frozen at `snap`."""
