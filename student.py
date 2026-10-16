@@ -31,6 +31,7 @@ def angles(zone: int, k: int | None = None) -> list[float]:
     c, h = 45.0 * zone, (CFG["alpha"] if zone == 0 else CFG["beta"])
     return [tri_ppf((i + 0.5) / k, c, h) for i in range(k)]
 
+LATEST_LOOP = True  # False = the template's BaseAgent.run (answers every queued state; collapses if a decision takes > ~33 ms)
 AGENT_ID: str | None = None  # TODO(group): set to a group member's mechanographic number before submission
 VALUE_TAIL = True  # when no zone is expected to hit, choose by a value function over landing x (value iteration, static bricks)
 MC_DEPTH = 0  # >0: score each zone by damage/time over this many cycles of a greedy rollout policy (brick changes modelled)
@@ -63,7 +64,7 @@ class StudentAgent(BaseAgent):
         self._rng = random.Random(12345)
 
     async def run(self) -> None:
-        await run_latest(self)
+        await (run_latest(self) if LATEST_LOOP else super().run())
 
     def plan(self, st: dict[str, Any], px: float, lat: int) -> float | None:
         f = Field(st)
