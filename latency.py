@@ -1,45 +1,54 @@
-"""Infer the action delay from the agent's own history and dead-reckon where the paddle will be."""
+"""Tick-indexed paddle tracker: infers the action delay from the agent's own moves and dead-reckons the paddle.
 
-from collections import deque
+Ticks come from the server clock (round(time_elapsed * 30)), so skipped states (a slow agent) are handled: a tick
+without a decision counts as "no move".
+"""
 
 STEP = 28.0
-MAX_LAT = 3
-WINDOW = 14
+MAX_LAT = 12
+KEEP = 48  # ticks of history
 
 
 class PaddleTracker:
-    """Per tick call update(observed paddle x, move sent at the previous tick); returns (effective x, latency).
-
-    Tick t shows px_t. Decision d_t is applied before update t+lat, so px_{t+1} - px_t is the effect of d_{t-lat} and the
-    moves not yet visible in px_t are the last `lat` decisions.
-    """
-
     def __init__(self, paddle_width: float, field_width: float) -> None:
         self.hi = field_width - paddle_width
-        self.obs: deque[float] = deque(maxlen=WINDOW)
-        self.sent: deque[int] = deque(maxlen=WINDOW - 1)  # sent[i] is the decision taken right after obs[i]
+        self.obs: dict[int, float] = {}
+        self.sent: dict[int, int] = {}  # tick -> -1 / +1 (absent = no move)
         self.lat = 0
 
     def _clamp(self, x: float) -> float:
         return min(self.hi, max(0.0, x))
 
-    def _mismatches(self, lat: int) -> int:
-        bad = 0
-        for i in range(lat, len(self.obs) - 1):
-            expect = self._clamp(self.obs[i] + self.sent[i - lat] * STEP) - self.obs[i]
-            bad += abs((self.obs[i + 1] - self.obs[i]) - expect) > 0.5
-        return bad
+    def _mismatches(self, lat: int) -> tuple[int, int]:
+        """Replay our own moves between consecutive observations (any gap) under a latency hypothesis."""
+        bad = n = 0
+        ticks = sorted(self.obs)
+        for t1, t2 in zip(ticks, ticks[1:], strict=False):
+            if not any(self.sent.get(s - k) for s in range(t1, t2) for k in range(MAX_LAT + 1)):
+                continue  # no move could explain a change: uninformative
+            x = self.obs[t1]
+            for s in range(t1, t2):
+                x = self._clamp(x + self.sent.get(s - lat, 0) * STEP)
+            n += 1
+            bad += abs(x - self.obs[t2]) > 0.5
+        return bad, n
 
-    def update(self, px: float, last_sent: int) -> tuple[float, int]:
-        if self.obs:
-            self.sent.append(last_sent)
-        self.obs.append(px)
-        if len(self.obs) >= 6:
-            scores = [self._mismatches(lat) for lat in range(MAX_LAT + 1)]
-            best = min(scores)
-            if scores[self.lat] > best:  # keep the current estimate unless another is strictly better
-                self.lat = scores.index(best)
+    def observe(self, tick: int, px: float) -> tuple[float, int]:
+        """Record the paddle x seen at `tick`; returns (effective x including moves still in flight, latency)."""
+        self.obs[tick] = px
+        for d in (self.obs, self.sent):
+            for t in [t for t in d if t < tick - KEEP]:
+                del d[t]
+        scores = [self._mismatches(lat) for lat in range(MAX_LAT + 1)]
+        if scores[0][1] >= 4:
+            best = min(s[0] for s in scores)
+            if scores[self.lat][0] > best:  # keep the current estimate unless another is strictly better
+                self.lat = [s[0] for s in scores].index(best)
         eff = px
-        for m in list(self.sent)[len(self.sent) - self.lat:] if self.lat else []:
-            eff = self._clamp(eff + m * STEP)
+        for t in range(tick - self.lat, tick):
+            eff = self._clamp(eff + self.sent.get(t, 0) * STEP)
         return eff, self.lat
+
+    def record(self, tick: int, move: int) -> None:
+        if move:
+            self.sent[tick] = move
