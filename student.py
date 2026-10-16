@@ -9,6 +9,8 @@ import asyncio
 from typing import Any
 
 from agents.base_agent import BaseAgent
+from latency import PaddleTracker
+from netloop import run_latest
 
 AGENT_ID: str | None = None  # TODO(group): set to a group member's mechanographic number before submission
 STEP = 28.0
@@ -38,19 +40,30 @@ def target_x(st: dict[str, Any]) -> float | None:
 
 
 class StudentAgent(BaseAgent):
+    _tracker: PaddleTracker | None = None
+
+    async def run(self) -> None:
+        await run_latest(self)
+
     async def deliberate(self) -> dict[str, Any] | None:
         st = self.current_state
         if not st or st.get("game_over"):
             return None
         pw = st["paddle_width"]
+        if self._tracker is None:
+            self._tracker = PaddleTracker(pw, st["width"])
+        tick = round(st["time_elapsed"] * 30)
+        px, _ = self._tracker.observe(tick, st["paddle_x"])
         land = landing_x(st["ball_x"], st["ball_y"], st["ball_vx"], st["ball_vy"], st) if st["ball_vy"] else st["ball_x"]
         tgt = target_x(st)
         zone_off = 0.0  # offset of the paddle centre from the landing point
         if tgt is not None and abs(tgt - land) > DEAD_BAND:
             # right third sends the ball right: ball must land on the right part of the paddle, so the paddle sits left
             zone_off = -pw / 3 if tgt > land else pw / 3
-        diff = land + zone_off - pw / 2.0 - st["paddle_x"]
-        if abs(diff) < STEP / 2:
+        diff = land + zone_off - pw / 2.0 - px
+        move = 0 if abs(diff) < STEP / 2 else (1 if diff > 0 else -1)
+        self._tracker.record(tick, move)
+        if not move:
             return None
         return {"action": "move", "direction": "EAST" if diff > 0 else "WEST"}
 
