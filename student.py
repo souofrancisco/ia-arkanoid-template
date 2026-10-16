@@ -95,8 +95,8 @@ class StudentAgent(BaseAgent):
             best_u, best_p = -math.inf, None
             for zone, (moves, _, p) in best_for_zone.items():
                 tot_d = tot_t = 0.0
-                for ang in angles(zone, MC_SAMPLES):
-                    d, t = self.policy_rollout(f, after_base, xl, zone, ang, MC_DEPTH)
+                for si, ang in enumerate(angles(zone, MC_SAMPLES)):
+                    d, t = self.policy_rollout(f, after_base, xl, zone, ang, MC_DEPTH, random.Random(1000 + si))
                     tot_d += d
                     tot_t += t
                 u = tot_d / max(tot_t, 1e-6) - 1e-4 * moves
@@ -147,7 +147,7 @@ class StudentAgent(BaseAgent):
                 return tail_p
         return best_p
 
-    def policy_rollout(self, f: Field, snap: Any, x: float, zone: int, ang: float, depth: int) -> tuple[float, float]:
+    def policy_rollout(self, f: Field, snap: Any, x: float, zone: int, ang: float, depth: int, rng: random.Random) -> tuple[float, float]:
         """(damage, time) of `depth` paddle cycles: first with (zone, ang), later ones greedy by nominal 1-step rate with a sampled angle."""
         f.restore(snap)
         dmg = tim = 0.0
@@ -163,7 +163,7 @@ class StudentAgent(BaseAgent):
                         best, zone = rate, z
                 f.restore(snap)
                 c, hh = 45.0 * zone, (CFG["alpha"] if zone == 0 else CFG["beta"])
-                ang = tri_ppf(self._rng.random(), c, hh)
+                ang = tri_ppf(rng.random(), c, hh)  # common random numbers: same draws for every candidate zone
             x2, t2, hits, breaks, _, _ = fly(f, x, f.y_pad, *zone_velocity(f, zone, ang))
             dmg += hits + W_BREAK * breaks
             tim += max(t2 if x2 is not None else 20.0, CYCLE_FLOOR)
