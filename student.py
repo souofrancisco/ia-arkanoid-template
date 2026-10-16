@@ -11,6 +11,7 @@ import math
 from typing import Any
 
 from agents.base_agent import BaseAgent
+from latency import PaddleTracker
 from model import Field, fly, move_costs, zone_velocity
 
 CFG = {"side": 45.0, "alpha": 8.0, "beta": 15.0}  # config.json paddle.angles (documented in the assignment)
@@ -37,16 +38,18 @@ class StudentAgent(BaseAgent):
         super().__init__(*a, **k)
         self._key: tuple | None = None
         self._target: float | None = None
+        self._tracker: PaddleTracker | None = None
+        self._last = 0
 
-    def plan(self, st: dict[str, Any]) -> float | None:
+    def plan(self, st: dict[str, Any], px: float, lat: int) -> float | None:
         f = Field(st)
         bx, by, vx, vy = st["ball_x"], st["ball_y"], st["ball_vx"], st["ball_vy"]
         xl, tl, *_ = fly(f, bx, by, vx, vy)
         if xl is None:
             return None
         after_base = f.snapshot()
-        budget = max(1, math.ceil(tl * 30.0 - 1e-9))
-        px, pw = st["paddle_x"], st["paddle_width"]
+        budget = max(1, math.ceil(tl * 30.0 - 1e-9) - lat)
+        pw = st["paddle_width"]
         best_for_zone: dict[int, tuple[int, float, float]] = {}
         for p, moves in move_costs(px, pw, f.W).items():
             rel = xl - p
@@ -81,16 +84,20 @@ class StudentAgent(BaseAgent):
         st = self.current_state
         if not st or st.get("game_over"):
             return None
-        key = (st["ball_vx"], st["ball_vy"], len(st["bricks"]), sum(b["hits_remaining"] for b in st["bricks"]),
+        if self._tracker is None:
+            self._tracker = PaddleTracker(st["paddle_width"], st["width"])
+        px, lat = self._tracker.update(st["paddle_x"], self._last)
+        key = (lat, st["ball_vx"], st["ball_vy"], len(st["bricks"]), sum(b["hits_remaining"] for b in st["bricks"]),
                st["lives"], st["stage"])
         if key != self._key:
             self._key = key
-            self._target = self.plan(st)
+            self._target = self.plan(st, px, lat)
         if self._target is None:  # no usable plan: just follow the ball
-            diff = st["ball_x"] - st["paddle_width"] / 2.0 - st["paddle_x"]
+            diff = st["ball_x"] - st["paddle_width"] / 2.0 - px
         else:
-            diff = self._target - st["paddle_x"]
-        if abs(diff) < 14.0:
+            diff = self._target - px
+        self._last = 0 if abs(diff) < 14.0 else (1 if diff > 0 else -1)
+        if not self._last:
             return None
         return {"action": "move", "direction": "EAST" if diff > 0 else "WEST"}
 
