@@ -27,6 +27,7 @@ def angles(zone: int) -> list[float]:
     c, h = 45.0 * zone, (CFG["alpha"] if zone == 0 else CFG["beta"])
     return [tri_ppf((i + 0.5) / K_SAMPLES, c, h) for i in range(K_SAMPLES)]
 
+LATEST_LOOP = True  # False = the template's BaseAgent.run (answers every queued state; collapses if a decision takes > ~33 ms)
 AGENT_ID: str | None = None  # TODO(group): set to a group member's mechanographic number before submission
 K_SAMPLES = 9  # stratified quantiles of the triangular bounce-angle distribution per zone
 W_BREAK = 0.5  # extra utility for finishing a brick (on top of 1 per hit)
@@ -45,7 +46,7 @@ class StudentAgent(BaseAgent):
         self._tracker: PaddleTracker | None = None
 
     async def run(self) -> None:
-        await run_latest(self)
+        await (run_latest(self) if LATEST_LOOP else super().run())
 
     def plan(self, st: dict[str, Any], px: float, lat: int) -> float | None:
         f = Field(st)
