@@ -44,10 +44,11 @@ class TestTracker(unittest.TestCase):
     def test_infers_delay(self) -> None:
         for true_lat in (0, 1, 3, 6):
             tr = PaddleTracker(84.0, 600.0)
-            px, moves = 258.0, {}
+            px = 258.0
             inflight = {}
             for tick in range(40):
-                px = min(516.0, max(0.0, px + inflight.get(tick, 0) * STEP))  # a move decided at t is visible in the observation of tick t+1+lat
+                # a move decided at tick t shows up in the observation of tick t + 1 + lat
+                px = min(516.0, max(0.0, px + inflight.get(tick, 0) * STEP))
                 eff, lat = tr.observe(tick, px)
                 move = 1 if (tick // 5) % 2 == 0 else -1
                 tr.record(tick, move)

@@ -31,7 +31,8 @@ class Field:
         self.x1 = np.array([b["x"] + b["width"] + r for b in bricks])
         self.y0 = np.array([b["y"] - r for b in bricks])
         self.y1 = np.array([b["y"] + b["height"] + r for b in bricks])
-        self.health = np.array([INF_HEALTH if b["indestructible"] else b["hits_remaining"] for b in bricks], dtype=np.int32)
+        hp = [INF_HEALTH if b["indestructible"] else b["hits_remaining"] for b in bricks]
+        self.health = np.array(hp, dtype=np.int32)
         self.points = np.array([0 if b["indestructible"] else b["points"] for b in bricks], dtype=np.float64)
         self.alive = np.ones(len(bricks), dtype=bool)
         self.hit_log: list[int] = []  # destructible bricks damaged by the last fly(), in order

@@ -9,14 +9,14 @@ import argparse
 import asyncio
 import math
 import random
+from typing import Any
 
 import numpy as np
-from typing import Any
 
 from agents.base_agent import BaseAgent
 from latency import PaddleTracker
-from netloop import run_latest
 from model import Field, fly, move_costs, zone_velocity
+from netloop import run_latest
 
 CFG = {"side": 45.0, "alpha": 8.0, "beta": 15.0}  # config.json paddle.angles (documented in the assignment)
 
@@ -31,14 +31,19 @@ def angles(zone: int, k: int | None = None) -> list[float]:
     c, h = 45.0 * zone, (CFG["alpha"] if zone == 0 else CFG["beta"])
     return [tri_ppf((i + 0.5) / k, c, h) for i in range(k)]
 
-LATEST_LOOP = True  # False = the template's BaseAgent.run (answers every queued state; collapses if a decision takes > ~33 ms)
+# False = the template's BaseAgent.run (answers every queued state; collapses if a decision takes > ~33 ms)
+LATEST_LOOP = True
 AGENT_ID: str | None = None  # TODO(group): set to a group member's mechanographic number before submission
-VALUE_TAIL = True  # when no zone is expected to hit, choose by a value function over landing x (value iteration, static bricks)
-AFFINE_MU = 0.0  # >0: utility = hits + W_BREAK*breaks - AFFINE_MU*cycle_seconds (time-to-go objective) instead of the rate hits/cycle_seconds
-SCARCITY = 0.0  # >0: bricks that few launches reach are worth up to 1+SCARCITY hits (reach map, 11x3x3 flights per brick state)
+# when no zone is expected to hit, choose by a value function over landing x (value iteration, static bricks)
+VALUE_TAIL = True
+# >0: utility = hits + W_BREAK*breaks - AFFINE_MU*cycle_seconds instead of the rate hits/cycle_seconds
+AFFINE_MU = 0.0
+# >0: bricks that few launches reach are worth up to 1+SCARCITY hits (reach map, 11x3x3 flights per brick state)
+SCARCITY = 0.0
 SC_GRID = 11
 SC_K = 3
-MC_DEPTH = 0  # >0: score each zone by damage/time over this many cycles of a greedy rollout policy (brick changes modelled)
+# >0: score each zone by damage/time over this many cycles of a greedy rollout policy (brick changes modelled)
+MC_DEPTH = 0
 MC_SAMPLES = 5
 VALUE_BLEND = 0.0  # >0: add this weight times V(next landing x) to every sample's utility (all game phases)
 VT_GRID = 13  # landing-x grid points
@@ -157,8 +162,10 @@ class StudentAgent(BaseAgent):
                 return tail_p
         return best_p
 
-    def policy_rollout(self, f: Field, snap: Any, x: float, zone: int, ang: float, depth: int, rng: random.Random) -> tuple[float, float]:
-        """(damage, time) of `depth` paddle cycles: first with (zone, ang), later ones greedy by nominal 1-step rate with a sampled angle."""
+    def policy_rollout(
+        self, f: Field, snap: Any, x: float, zone: int, ang: float, depth: int, rng: random.Random
+    ) -> tuple[float, float]:
+        """(damage, time) of `depth` cycles: first with (zone, ang), then greedy zones with sampled angles."""
         f.restore(snap)
         dmg = tim = 0.0
         for i in range(depth):
@@ -183,7 +190,7 @@ class StudentAgent(BaseAgent):
         return dmg, tim
 
     def brick_weights(self, f: Field, snap: Any) -> np.ndarray:
-        """Per-brick value 1..1+SCARCITY: 1 for bricks every launch reaches, up to 1+SCARCITY for the least reachable."""
+        """Per-brick value 1..1+SCARCITY: 1 if every launch reaches it, 1+SCARCITY for the least reachable."""
         key = (tuple(snap[0].tolist()), tuple(snap[1].tolist()))
         if getattr(self, "_bw_key", None) == key:
             return self._bw
@@ -231,7 +238,7 @@ class StudentAgent(BaseAgent):
         return V
 
     def deep(self, f: Field, snap: Any, x: float, zone: int, depth: int, k: int) -> float:
-        """Mean damage (hits + W_BREAK*breaks, discounted) of a paddle contact in `zone` at x, then the best zone each later cycle."""
+        """Mean discounted damage of a contact in `zone` at x, then the best zone in each later cycle."""
         tot = 0.0
         for ang in angles(zone, k):
             f.restore(snap)
