@@ -8,6 +8,7 @@ the outcome (brick damage per second) and walks the paddle to the lattice positi
 import argparse
 import asyncio
 import math
+import random
 
 import numpy as np
 from typing import Any
@@ -32,6 +33,8 @@ def angles(zone: int, k: int | None = None) -> list[float]:
 
 AGENT_ID: str | None = None  # TODO(group): set to a group member's mechanographic number before submission
 VALUE_TAIL = True  # when no zone is expected to hit, choose by a value function over landing x (value iteration, static bricks)
+MC_DEPTH = 0  # >0: score each zone by damage/time over this many cycles of a greedy rollout policy (brick changes modelled)
+MC_SAMPLES = 5
 VALUE_BLEND = 0.0  # >0: add this weight times V(next landing x) to every sample's utility (all game phases)
 VT_GRID = 21  # landing-x grid points
 VT_K = 5  # angle samples per (x, zone) in the value table
@@ -57,6 +60,7 @@ class StudentAgent(BaseAgent):
         self._target: float | None = None
         self._tracker: PaddleTracker | None = None
         self._vt_key: tuple | None = None
+        self._rng = random.Random(12345)
 
     async def run(self) -> None:
         await run_latest(self)
@@ -86,6 +90,18 @@ class StudentAgent(BaseAgent):
             list(zip(((f.x0 + f.x1) / 2)[live], ((f.y0 + f.y1) / 2)[live], strict=True)) if live.any() else []
         )
         vtab = self.value_table(f, after_base) if VALUE_BLEND > 0 else None
+        if MC_DEPTH:
+            best_u, best_p = -math.inf, None
+            for zone, (moves, _, p) in best_for_zone.items():
+                tot_d = tot_t = 0.0
+                for ang in angles(zone, MC_SAMPLES):
+                    d, t = self.policy_rollout(f, after_base, xl, zone, ang, MC_DEPTH)
+                    tot_d += d
+                    tot_t += t
+                u = tot_d / max(tot_t, 1e-6) - 1e-4 * moves
+                if u > best_u:
+                    best_u, best_p = u, p
+            return best_p
         best_u, best_p = -math.inf, None
         gains: dict[int, float] = {}
         trans_of: dict[int, list] = {}
@@ -129,6 +145,31 @@ class StudentAgent(BaseAgent):
             if best_v > 1e-9:  # only override when the search actually finds damage
                 return tail_p
         return best_p
+
+    def policy_rollout(self, f: Field, snap: Any, x: float, zone: int, ang: float, depth: int) -> tuple[float, float]:
+        """(damage, time) of `depth` paddle cycles: first with (zone, ang), later ones greedy by nominal 1-step rate with a sampled angle."""
+        f.restore(snap)
+        dmg = tim = 0.0
+        for i in range(depth):
+            if i:
+                snap = f.snapshot()
+                best, zone = -math.inf, 0
+                for z in (-1, 0, 1):
+                    f.restore(snap)
+                    x2, t2, h, b, _, _ = fly(f, x, f.y_pad, *zone_velocity(f, z))
+                    rate = (h + W_BREAK * b) / max(t2 if x2 is not None else 20.0, CYCLE_FLOOR)
+                    if rate > best:
+                        best, zone = rate, z
+                f.restore(snap)
+                c, hh = 45.0 * zone, (CFG["alpha"] if zone == 0 else CFG["beta"])
+                ang = tri_ppf(self._rng.random(), c, hh)
+            x2, t2, hits, breaks, _, _ = fly(f, x, f.y_pad, *zone_velocity(f, zone, ang))
+            dmg += hits + W_BREAK * breaks
+            tim += max(t2 if x2 is not None else 20.0, CYCLE_FLOOR)
+            if x2 is None:
+                break
+            x = x2
+        return dmg, tim
 
     def value_table(self, f: Field, snap: Any) -> np.ndarray:
         """V(x): expected discounted damage over future cycles when the ball lands at x, bricks frozen at `snap`."""
