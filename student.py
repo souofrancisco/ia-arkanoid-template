@@ -12,6 +12,7 @@ from typing import Any
 
 from agents.base_agent import BaseAgent
 from latency import PaddleTracker
+from netloop import run_latest
 from model import Field, fly, move_costs, zone_velocity
 
 AGENT_ID: str | None = None  # TODO(group): set to a group member's mechanographic number before submission
@@ -26,7 +27,9 @@ class StudentAgent(BaseAgent):
         self._key: tuple | None = None
         self._target: float | None = None
         self._tracker: PaddleTracker | None = None
-        self._last = 0
+
+    async def run(self) -> None:
+        await run_latest(self)
 
     def plan(self, st: dict[str, Any], px: float, lat: int) -> float | None:
         f = Field(st)
@@ -70,7 +73,8 @@ class StudentAgent(BaseAgent):
             return None
         if self._tracker is None:
             self._tracker = PaddleTracker(st["paddle_width"], st["width"])
-        px, lat = self._tracker.update(st["paddle_x"], self._last)
+        tick = round(st["time_elapsed"] * 30)
+        px, lat = self._tracker.observe(tick, st["paddle_x"])
         key = (lat, st["ball_vx"], st["ball_vy"], len(st["bricks"]), sum(b["hits_remaining"] for b in st["bricks"]),
                st["lives"], st["stage"])
         if key != self._key:
@@ -80,8 +84,9 @@ class StudentAgent(BaseAgent):
             diff = st["ball_x"] - st["paddle_width"] / 2.0 - px
         else:
             diff = self._target - px
-        self._last = 0 if abs(diff) < 14.0 else (1 if diff > 0 else -1)
-        if not self._last:
+        move = 0 if abs(diff) < 14.0 else (1 if diff > 0 else -1)
+        self._tracker.record(tick, move)
+        if not move:
             return None
         return {"action": "move", "direction": "EAST" if diff > 0 else "WEST"}
 
