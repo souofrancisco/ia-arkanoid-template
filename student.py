@@ -34,6 +34,7 @@ def angles(zone: int, k: int | None = None) -> list[float]:
 LATEST_LOOP = True  # False = the template's BaseAgent.run (answers every queued state; collapses if a decision takes > ~33 ms)
 AGENT_ID: str | None = None  # TODO(group): set to a group member's mechanographic number before submission
 VALUE_TAIL = True  # when no zone is expected to hit, choose by a value function over landing x (value iteration, static bricks)
+AFFINE_MU = 0.0  # >0: utility = hits + W_BREAK*breaks - AFFINE_MU*cycle_seconds (time-to-go objective) instead of the rate hits/cycle_seconds
 SCARCITY = 0.0  # >0: bricks that few launches reach are worth up to 1+SCARCITY hits (reach map, 11x3x3 flights per brick state)
 SC_GRID = 11
 SC_K = 3
@@ -122,7 +123,10 @@ class StudentAgent(BaseAgent):
                 near = min((math.hypot(qx - cx, qy - cy) for qx, qy in path for cx, cy in centres), default=0.0)
                 if bw is not None:
                     hits = float(sum(bw[i] for i in f.hit_log))
-                u += (hits + W_BREAK * breaks) / cycle - W_NEAR * near
+                if AFFINE_MU > 0:
+                    u += (hits + W_BREAK * breaks) - AFFINE_MU * cycle - W_NEAR * near
+                else:
+                    u += (hits + W_BREAK * breaks) / cycle - W_NEAR * near
                 g += hits + W_BREAK * breaks
                 if vtab is not None and x2 is not None:
                     u += VALUE_BLEND * float(np.interp(x2, self._vx, vtab))
