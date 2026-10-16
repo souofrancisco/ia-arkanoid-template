@@ -15,6 +15,7 @@ from latency import PaddleTracker
 from netloop import run_latest
 from model import Field, fly, move_costs, zone_velocity
 
+LATEST_LOOP = True  # False = the template's BaseAgent.run (answers every queued state; collapses if a decision takes > ~33 ms)
 AGENT_ID: str | None = None  # TODO(group): set to a group member's mechanographic number before submission
 W_BREAK = 0.5  # extra utility for finishing a brick (on top of 1 per hit)
 W_NEAR = 0.002  # utility per px of closeness of the flight to the nearest live destructible brick
@@ -29,7 +30,7 @@ class StudentAgent(BaseAgent):
         self._tracker: PaddleTracker | None = None
 
     async def run(self) -> None:
-        await run_latest(self)
+        await (run_latest(self) if LATEST_LOOP else super().run())
 
     def plan(self, st: dict[str, Any], px: float, lat: int) -> float | None:
         f = Field(st)
