@@ -28,6 +28,10 @@ def angles(zone: int, k: int | None = None) -> list[float]:
     return [tri_ppf((i + 0.5) / k, c, h) for i in range(k)]
 
 AGENT_ID: str | None = None  # TODO(group): set to a group member's mechanographic number before submission
+TAIL_DEPTH = 0  # >0: when no zone is expected to hit anything, search this many paddle cycles ahead (sequence of zones)
+TAIL_THRESH = 0.3  # expected damage below which the tail search replaces the rate utility
+TAIL_K = 3  # angle samples per zone at the first tail level (deeper levels use the nominal angle)
+TAIL_GAMMA = 0.9
 HORIZON = 1  # 2 adds a greedy second paddle cycle after each sampled first cycle
 K2 = 3  # angle samples per zone in the second cycle
 GAMMA = 0.9  # weight of the second cycle
@@ -70,8 +74,10 @@ class StudentAgent(BaseAgent):
             list(zip(((f.x0 + f.x1) / 2)[live], ((f.y0 + f.y1) / 2)[live], strict=True)) if live.any() else []
         )
         best_u, best_p = -math.inf, None
+        gains: dict[int, float] = {}
         for zone, (moves, _, p) in best_for_zone.items():
             u = 0.0
+            g = 0.0
             for ang in angles(zone):
                 f.restore(after_base)
                 zvx, zvy = zone_velocity(f, zone, ang)
@@ -79,12 +85,36 @@ class StudentAgent(BaseAgent):
                 cycle = max(t2 if x2 is not None else 20.0, CYCLE_FLOOR)
                 near = min((math.hypot(qx - cx, qy - cy) for qx, qy in path for cx, cy in centres), default=0.0)
                 u += (hits + W_BREAK * breaks) / cycle - W_NEAR * near
+                g += hits + W_BREAK * breaks
                 if HORIZON >= 2 and x2 is not None:
                     u += GAMMA * self.second_cycle(f, x2, centres)
             u = u / K_SAMPLES - 1e-4 * moves
+            gains[zone] = g / K_SAMPLES
             if u > best_u:
                 best_u, best_p = u, p
+        if TAIL_DEPTH and max(gains.values()) < TAIL_THRESH:
+            best_v, tail_p = -math.inf, best_p
+            for zone, (moves, _, p) in best_for_zone.items():
+                v = self.deep(f, after_base, xl, zone, TAIL_DEPTH, TAIL_K) - 1e-4 * moves
+                if v > best_v:
+                    best_v, tail_p = v, p
+            if best_v > 1e-9:  # only override when the search actually finds damage
+                return tail_p
         return best_p
+
+    def deep(self, f: Field, snap: Any, x: float, zone: int, depth: int, k: int) -> float:
+        """Mean damage (hits + W_BREAK*breaks, discounted) of a paddle contact in `zone` at x, then the best zone each later cycle."""
+        tot = 0.0
+        for ang in angles(zone, k):
+            f.restore(snap)
+            zvx, zvy = zone_velocity(f, zone, ang)
+            x2, _, hits, breaks, _, _ = fly(f, x, f.y_pad, zvx, zvy)
+            v = hits + W_BREAK * breaks
+            if depth > 1 and x2 is not None:
+                s2 = f.snapshot()
+                v += TAIL_GAMMA * max(self.deep(f, s2, x2, z2, depth - 1, 1) for z2 in (-1, 0, 1))
+            tot += v
+        return tot / k
 
     def second_cycle(self, f: Field, x: float, centres: list) -> float:
         """Best zone's mean utility of the next paddle cycle from landing point x (state after the first cycle)."""
