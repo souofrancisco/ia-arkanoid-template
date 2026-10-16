@@ -162,3 +162,28 @@ def move_costs(px: float, pw: float, W: float) -> dict[float, int]:
                     nxt.append(q)
         frontier = nxt
     return dist
+
+
+N_FEATURES = 21
+
+
+def brick_features(f: Field, x2: float) -> np.ndarray:
+    """Map-agnostic summary of the remaining destructible bricks as seen from a ball landing at x2 (for a learned time-to-go)."""
+    live = f.alive & f.destructible
+    hp = f.health[live].astype(np.float64)
+    out = np.zeros(N_FEATURES)
+    if hp.size == 0:
+        out[19] = x2 / f.W
+        return out
+    cx = ((f.x0 + f.x1) / 2)[live]
+    cy = ((f.y0 + f.y1) / 2)[live]
+    out[0] = hp.sum() / 60.0
+    out[1] = hp.size / 40.0
+    out[2:11] = np.bincount(np.clip((cx / f.W * 9).astype(int), 0, 8), weights=hp, minlength=9) / 20.0
+    out[11:17] = np.bincount(np.clip(((cy - 60.0) / 60.0).astype(int), 0, 5), weights=hp, minlength=6) / 20.0
+    dx = np.abs(cx - x2) / f.W
+    out[17] = float((dx * hp).sum() / hp.sum())
+    out[18] = float(dx.min())
+    out[19] = x2 / f.W
+    out[20] = (x2 / f.W) ** 2
+    return out
