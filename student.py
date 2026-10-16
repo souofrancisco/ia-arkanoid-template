@@ -30,13 +30,13 @@ def angles(zone: int, k: int | None = None) -> list[float]:
     return [tri_ppf((i + 0.5) / k, c, h) for i in range(k)]
 
 AGENT_ID: str | None = None  # TODO(group): set to a group member's mechanographic number before submission
-VALUE_TAIL = False  # when no zone is expected to hit, choose by a value function over landing x (value iteration, static bricks)
+VALUE_TAIL = True  # when no zone is expected to hit, choose by a value function over landing x (value iteration, static bricks)
 VT_GRID = 21  # landing-x grid points
 VT_K = 5  # angle samples per (x, zone) in the value table
 VT_ITERS = 8
 VT_GAMMA = 0.85
 TAIL_DEPTH = 0  # >0: when no zone is expected to hit anything, search this many paddle cycles ahead (sequence of zones)
-TAIL_THRESH = 0.3  # expected damage below which the tail search replaces the rate utility
+TAIL_THRESH = 1.0  # expected damage below which the tail search replaces the rate utility
 TAIL_K = 3  # angle samples per zone at the first tail level (deeper levels use the nominal angle)
 TAIL_GAMMA = 0.9
 HORIZON = 1  # 2 adds a greedy second paddle cycle after each sampled first cycle
