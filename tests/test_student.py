@@ -68,6 +68,13 @@ class TestAgent(unittest.TestCase):
                 g.move_paddle(a["direction"])
             g.update(1 / 30)
 
+    def test_survives_planner_failure(self) -> None:
+        agent = StudentAgent("ws://none", "t", "t")
+        agent.plan = lambda *a, **k: 1 / 0  # type: ignore[method-assign]
+        agent.current_state = new_game().get_state()
+        a = asyncio.run(agent.deliberate())
+        self.assertTrue(a is None or a["action"] == "move")
+
 
 if __name__ == "__main__":
     unittest.main()

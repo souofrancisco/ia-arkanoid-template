@@ -11,6 +11,7 @@ moves and netloop.py answers only the newest state, so a slow decision never bui
 
 import argparse
 import asyncio
+import logging
 import math
 from typing import Any
 
@@ -149,7 +150,11 @@ class StudentAgent(BaseAgent):
                st["lives"], st["stage"])
         if key != self._key:
             self._key = key
-            self._target = self.plan(st, px, lat)
+            try:
+                self._target = self.plan(st, px, lat)
+            except Exception:  # a planner bug on an unseen map must not kill the run: follow the ball instead
+                logging.exception("plan failed; following the ball")
+                self._target = None
         if self._target is None:  # no usable plan: just follow the ball
             diff = st["ball_x"] - st["paddle_width"] / 2.0 - px
         else:
