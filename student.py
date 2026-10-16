@@ -31,6 +31,7 @@ def angles(zone: int, k: int | None = None) -> list[float]:
 
 AGENT_ID: str | None = None  # TODO(group): set to a group member's mechanographic number before submission
 VALUE_TAIL = True  # when no zone is expected to hit, choose by a value function over landing x (value iteration, static bricks)
+VALUE_BLEND = 0.0  # >0: add this weight times V(next landing x) to every sample's utility (all game phases)
 VT_GRID = 21  # landing-x grid points
 VT_K = 5  # angle samples per (x, zone) in the value table
 VT_ITERS = 8
@@ -81,6 +82,7 @@ class StudentAgent(BaseAgent):
         centres = (
             list(zip(((f.x0 + f.x1) / 2)[live], ((f.y0 + f.y1) / 2)[live], strict=True)) if live.any() else []
         )
+        vtab = self.value_table(f, after_base) if VALUE_BLEND > 0 else None
         best_u, best_p = -math.inf, None
         gains: dict[int, float] = {}
         trans_of: dict[int, list] = {}
@@ -96,6 +98,8 @@ class StudentAgent(BaseAgent):
                 near = min((math.hypot(qx - cx, qy - cy) for qx, qy in path for cx, cy in centres), default=0.0)
                 u += (hits + W_BREAK * breaks) / cycle - W_NEAR * near
                 g += hits + W_BREAK * breaks
+                if vtab is not None and x2 is not None:
+                    u += VALUE_BLEND * float(np.interp(x2, self._vx, vtab))
                 trans.append((hits + W_BREAK * breaks, x2))
                 if HORIZON >= 2 and x2 is not None:
                     u += GAMMA * self.second_cycle(f, x2, centres)
