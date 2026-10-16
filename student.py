@@ -12,6 +12,7 @@ from agents.base_agent import BaseAgent
 from latency import PaddleTracker
 from netloop import run_latest
 
+LATEST_LOOP = True  # False = the template's BaseAgent.run (answers every queued state; collapses if a decision takes > ~33 ms)
 AGENT_ID: str | None = None  # TODO(group): set to a group member's mechanographic number before submission
 STEP = 28.0
 DEAD_BAND = 40.0  # px between landing point and target below which the ball is sent straight up
@@ -43,7 +44,7 @@ class StudentAgent(BaseAgent):
     _tracker: PaddleTracker | None = None
 
     async def run(self) -> None:
-        await run_latest(self)
+        await (run_latest(self) if LATEST_LOOP else super().run())
 
     async def deliberate(self) -> dict[str, Any] | None:
         st = self.current_state
