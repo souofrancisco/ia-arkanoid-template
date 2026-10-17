@@ -163,3 +163,24 @@ def move_costs(px: float, pw: float, W: float) -> dict[float, int]:
                     nxt.append(q)
         frontier = nxt
     return dist
+
+
+def next_move(px: float, target: float, pw: float, W: float) -> int:
+    """First move (-1 west, +1 east, 0 stay) on a shortest clamped-lattice path from px to target; 0 if unreachable."""
+    if px == target:
+        return 0
+    hi = W - pw
+    first = {px: 0}
+    frontier = [px]
+    while frontier:
+        nxt = []
+        for p in frontier:
+            for d in (-1, 1):
+                q = min(hi, max(0.0, p + d * PADDLE_STEP))
+                if q not in first:
+                    first[q] = d if p == px else first[p]
+                    if q == target:
+                        return first[q]
+                    nxt.append(q)
+        frontier = nxt
+    return 0

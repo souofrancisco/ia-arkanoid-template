@@ -15,7 +15,7 @@ import numpy as np
 
 from agents.base_agent import BaseAgent
 from latency import PaddleTracker
-from model import Field, fly, move_costs, zone_velocity
+from model import Field, fly, move_costs, next_move, zone_velocity
 from netloop import run_latest
 
 CFG = {"side": 45.0, "alpha": 8.0, "beta": 15.0}  # config.json paddle.angles (documented in the assignment)
@@ -32,6 +32,9 @@ def angles(zone: int, k: int | None = None) -> list[float]:
     return [tri_ppf((i + 0.5) / k, c, h) for i in range(k)]
 
 # False = the template's BaseAgent.run (answers every queued state; collapses if a decision takes > ~33 ms)
+# True: walk the shortest lattice path to the target instead of stepping straight toward it
+PATH_FOLLOW = False
+HOLD_BAND = 14.0  # px: stay put when the target is closer than this (0.5 = only when exactly on the target lattice position)
 LATEST_LOOP = True
 AGENT_ID: str | None = None  # TODO(group): set to a group member's mechanographic number before submission
 # when no zone is expected to hit, choose by a value function over landing x (value iteration, static bricks)
@@ -285,7 +288,10 @@ class StudentAgent(BaseAgent):
             diff = st["ball_x"] - st["paddle_width"] / 2.0 - px
         else:
             diff = self._target - px
-        move = 0 if abs(diff) < 14.0 else (1 if diff > 0 else -1)
+        if PATH_FOLLOW and self._target is not None:
+            move = next_move(px, self._target, st["paddle_width"], st["width"])
+        else:
+            move = 0 if abs(diff) < HOLD_BAND else (1 if diff > 0 else -1)
         self._tracker.record(tick, move)
         if not move:
             return None
