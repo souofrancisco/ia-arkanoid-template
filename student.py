@@ -56,6 +56,8 @@ class StudentAgent(BaseAgent):
         self._vt_key: tuple | None = None
         self._vt: np.ndarray | None = None
         self._vx: np.ndarray | None = None
+        self._counts = np.zeros(VT_GRID, dtype=np.float64)
+        self._last_hp = -1
 
     async def run(self) -> None:
         await (run_latest(self) if LATEST_LOOP else super().run())
@@ -76,6 +78,11 @@ class StudentAgent(BaseAgent):
 
     def plan(self, st: dict[str, Any], px: float, lat: int) -> float | None:
         """Paddle x to walk to, or None when there is no usable plan (the caller then follows the ball)."""
+        cur_hp = sum(b["hits_remaining"] for b in st["bricks"] if not b["indestructible"])
+        if self._last_hp == -1 or cur_hp < self._last_hp:
+            self._last_hp = cur_hp
+            self._counts.fill(0.0)
+
         f = Field(st)
         xl, tl, *_ = fly(f, st["ball_x"], st["ball_y"], st["ball_vx"], st["ball_vy"])
         if xl is None:
@@ -102,14 +109,18 @@ class StudentAgent(BaseAgent):
             if u > best_u:
                 best_u, best_p = u, p
         if max(gains.values()) < TAIL_THRESH:
-            v = self.value_table(f, after_base)
+            v_raw = self.value_table(f, after_base)
+            idx = int(np.clip(np.round((xl - f.r) / ((f.W - 2 * f.r) / (VT_GRID - 1))), 0, VT_GRID - 1))
+            self._counts[idx] += 1.0
+            v_eff = v_raw / (1.0 + self._counts)
             best_q, tail_p = -math.inf, best_p
             for zone, (moves, _, p) in options.items():
-                q = sum(g + VT_GAMMA * (float(np.interp(x2, self._vx, v)) if x2 is not None else 0.0)
+                q = sum(g + VT_GAMMA * (float(np.interp(x2, self._vx, v_eff)) if x2 is not None else 0.0)
                         for g, x2 in landings[zone]) / K_SAMPLES - 1e-4 * moves
                 if q > best_q:
                     best_q, tail_p = q, p
             return tail_p
+        self._counts.fill(0.0)
         return best_p
 
     def value_table(self, f: Field, snap: Any) -> np.ndarray:
